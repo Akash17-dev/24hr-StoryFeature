@@ -1,5 +1,4 @@
 const storiesList = document.getElementById("storiesList");
-const addStoryButton = document.getElementById("addStory");
 const imageInput = document.getElementById("imageInput");
 const emptyMessage = document.getElementById("emptyMessage");
 const storyCount = document.getElementById("storyCount");
@@ -8,12 +7,12 @@ const viewerImage = document.getElementById("viewerImage");
 const viewerTime = document.getElementById("viewerTime");
 const progressBars = document.getElementById("progressBars");
 const oneDay = 24 * 60 * 60 * 1000;
+const storyDuration = 3000;
 const storageName = "daylightStories";
 let stories = [];
 let currentStory = 0;
 let touchStartX = 0;
 let storyTimer;
-const storyDuration = 3000;
 
 function loadStories() {
     const savedStories = localStorage.getItem(storageName);
@@ -22,11 +21,16 @@ function loadStories() {
         stories = JSON.parse(savedStories);
     }
 
-    const now = Date.now();
-    stories = stories.filter(function (story) {
-        return now - story.createdAt < oneDay;
-    });
+    const currentTime = Date.now();
+    const freshStories = [];
 
+    for (let i = 0; i < stories.length; i++) {
+        if (currentTime - stories[i].createdAt < oneDay) {
+            freshStories.push(stories[i]);
+        }
+    }
+
+    stories = freshStories;
     saveStories();
     showStories();
 }
@@ -36,42 +40,20 @@ function saveStories() {
 }
 
 function showStories() {
-    const oldStories = document.querySelectorAll(".saved-story");
-    oldStories.forEach(function (story) {
-        story.remove();
-    });
+    storiesList.innerHTML = '<button id="addStory" class="story add-story" type="button" aria-label="Add a story"><span class="story-ring add-ring"><span class="add-photo">＋</span></span><span class="story-name">Your story</span><span class="story-time">Add a moment</span></button>';
 
-    stories.forEach(function (story, index) {
-        const storyButton = document.createElement("button");
-        storyButton.className = "story saved-story";
-        storyButton.type = "button";
-        storyButton.setAttribute("aria-label", "Open story " + (index + 1));
+    for (let i = 0; i < stories.length; i++) {
+        const storyButton = '<button class="story saved-story" type="button" onclick="openStory(' + i + ')">' +
+            '<span class="story-ring"><img class="story-thumb" src="' + stories[i].image + '" alt="Story photo"></span>' +
+            '<span class="story-name">Your story</span>' +
+            '<span class="story-time">' + getTimeLabel(stories[i].createdAt) + '</span>' +
+            '</button>';
+        storiesList.innerHTML += storyButton;
+    }
 
-        const ring = document.createElement("span");
-        ring.className = "story-ring";
-
-        const image = document.createElement("img");
-        image.className = "story-thumb";
-        image.src = story.image;
-        image.alt = "Story photo";
-        ring.appendChild(image);
-
-        const name = document.createElement("span");
-        name.className = "story-name";
-        name.textContent = "Your story";
-
-        const time = document.createElement("span");
-        time.className = "story-time";
-        time.textContent = getTimeLabel(story.createdAt);
-
-        storyButton.appendChild(ring);
-        storyButton.appendChild(name);
-        storyButton.appendChild(time);
-        storyButton.addEventListener("click", function () {
-            openStory(index);
-        });
-        storiesList.appendChild(storyButton);
-    });
+    document.getElementById("addStory").onclick = function () {
+        imageInput.click();
+    };
 
     emptyMessage.hidden = stories.length > 0;
     storyCount.textContent = stories.length + (stories.length === 1 ? " story" : " stories");
@@ -79,55 +61,76 @@ function showStories() {
 
 function getTimeLabel(createdAt) {
     const minutes = Math.floor((Date.now() - createdAt) / 60000);
+
     if (minutes < 1) return "Just now";
     if (minutes < 60) return minutes + "m ago";
     return Math.floor(minutes / 60) + "h ago";
 }
 
-function resizeImage(file, done) {
+function resizeImage(file) {
     const reader = new FileReader();
+
     reader.onload = function () {
         const image = new Image();
+
         image.onload = function () {
             const scale = Math.min(1, 1080 / image.width, 1920 / image.height);
             const canvas = document.createElement("canvas");
             canvas.width = Math.round(image.width * scale);
             canvas.height = Math.round(image.height * scale);
+
             const context = canvas.getContext("2d");
             context.drawImage(image, 0, 0, canvas.width, canvas.height);
-            done(canvas.toDataURL("image/jpeg", 0.9));
+
+            stories.push({
+                image: canvas.toDataURL("image/jpeg", 0.9),
+                createdAt: Date.now()
+            });
+
+            saveStories();
+            showStories();
+            imageInput.value = "";
         };
+
         image.src = reader.result;
     };
+
     reader.readAsDataURL(file);
 }
 
 function openStory(index) {
     currentStory = index;
-    storyViewer.classList.add("open");
-    storyViewer.setAttribute("aria-hidden", "false");
+    storyViewer.className = "viewer open";
+    storyViewer.ariaHidden = "false";
     document.body.style.overflow = "hidden";
     showCurrentStory();
 }
 
 function showCurrentStory() {
     clearTimeout(storyTimer);
-    if (currentStory < 0) currentStory = stories.length - 1;
-    if (currentStory >= stories.length) currentStory = 0;
+
+    if (currentStory >= stories.length) {
+        closeStory();
+        return;
+    }
+
+    if (currentStory < 0) {
+        currentStory = stories.length - 1;
+    }
 
     viewerImage.src = stories[currentStory].image;
     viewerTime.textContent = getTimeLabel(stories[currentStory].createdAt);
     progressBars.innerHTML = "";
-    stories.forEach(function (story, index) {
-        const bar = document.createElement("span");
-        bar.className = "progress-bar";
-        if (index === currentStory) bar.classList.add("active");
-        progressBars.appendChild(bar);
-    });
 
-    const activeBar = progressBars.children[currentStory];
-    activeBar.style.setProperty("--story-duration", storyDuration + "ms");
-    activeBar.classList.add("playing");
+    for (let i = 0; i < stories.length; i++) {
+        if (i === currentStory) {
+            progressBars.innerHTML += '<span class="progress-bar active playing" style="--story-duration: ' + storyDuration + 'ms"></span>';
+        } else if (i < currentStory) {
+            progressBars.innerHTML += '<span class="progress-bar active"></span>';
+        } else {
+            progressBars.innerHTML += '<span class="progress-bar"></span>';
+        }
+    }
 
     storyTimer = setTimeout(function () {
         currentStory++;
@@ -137,72 +140,59 @@ function showCurrentStory() {
 
 function closeStory() {
     clearTimeout(storyTimer);
-    storyViewer.classList.remove("open");
-    storyViewer.setAttribute("aria-hidden", "true");
+    storyViewer.className = "viewer";
+    storyViewer.ariaHidden = "true";
     document.body.style.overflow = "";
 }
 
-addStoryButton.addEventListener("click", function () {
-    imageInput.click();
-});
+function nextStory() {
+    currentStory++;
+    showCurrentStory();
+}
 
-imageInput.addEventListener("change", function () {
+function previousStory() {
+    currentStory--;
+    showCurrentStory();
+}
+
+imageInput.onchange = function () {
     const file = imageInput.files[0];
+
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
+
+    if (file.type.indexOf("image/") !== 0) {
         alert("Please choose an image file.");
         imageInput.value = "";
         return;
     }
 
-    resizeImage(file, function (imageData) {
-        stories.push({ image: imageData, createdAt: Date.now() });
-        saveStories();
-        showStories();
-        imageInput.value = "";
-    });
-});
+    resizeImage(file);
+};
 
-document.getElementById("closeViewer").addEventListener("click", closeStory);
-document.getElementById("previousStory").addEventListener("click", function () {
-    currentStory--;
-    showCurrentStory();
-});
-document.getElementById("nextStory").addEventListener("click", function () {
-    currentStory++;
-    showCurrentStory();
-});
+document.getElementById("closeViewer").onclick = closeStory;
+document.getElementById("previousStory").onclick = previousStory;
+document.getElementById("nextStory").onclick = nextStory;
 
-storyViewer.addEventListener("click", function (event) {
+storyViewer.onclick = function (event) {
     if (event.target === storyViewer) closeStory();
-});
+};
 
-document.addEventListener("keydown", function (event) {
-    if (!storyViewer.classList.contains("open")) return;
+document.onkeydown = function (event) {
+    if (storyViewer.className !== "viewer open") return;
     if (event.key === "Escape") closeStory();
-    if (event.key === "ArrowRight") {
-        currentStory++;
-        showCurrentStory();
-    }
-    if (event.key === "ArrowLeft") {
-        currentStory--;
-        showCurrentStory();
-    }
-});
+    if (event.key === "ArrowRight") nextStory();
+    if (event.key === "ArrowLeft") previousStory();
+};
 
-storyViewer.addEventListener("touchstart", function (event) {
+storyViewer.ontouchstart = function (event) {
     touchStartX = event.changedTouches[0].screenX;
-});
+};
 
-storyViewer.addEventListener("touchend", function (event) {
+storyViewer.ontouchend = function (event) {
     const touchEndX = event.changedTouches[0].screenX;
-    if (touchStartX - touchEndX > 50) {
-        currentStory++;
-        showCurrentStory();
-    } else if (touchEndX - touchStartX > 50) {
-        currentStory--;
-        showCurrentStory();
-    }
-});
+
+    if (touchStartX - touchEndX > 50) nextStory();
+    if (touchEndX - touchStartX > 50) previousStory();
+};
 
 loadStories();
