@@ -23,6 +23,7 @@ h1 em { color: var(--green); }
 .stories-list { display: flex; gap: 24px; flex-wrap: wrap; }
 .story { width: 79px; display: flex; flex-direction: column; align-items: center; padding: 0; border: 0; background: none; color: var(--ink); cursor: pointer; font: inherit; }
 .story-ring { width: 70px; height: 70px; border-radius: 50%; padding: 3px; border: 1.5px solid #e8a879; display: grid; place-items: center; transition: transform .2s; }
+.story-ring.viewed { border-color: #d4d7cf; }
 .story:hover .story-ring { transform: translateY(-3px); }
 .story-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 50%; border: 2px solid var(--cream); }
 .add-ring { border: 1px dashed #b9c1b1; }

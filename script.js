@@ -43,8 +43,14 @@ function showStories() {
     storiesList.innerHTML = '<button id="addStory" class="story add-story" type="button" aria-label="Add a story"><span class="story-ring add-ring"><span class="add-photo">＋</span></span><span class="story-name">Your story</span><span class="story-time">Add a moment</span></button>';
 
     for (let i = 0; i < stories.length; i++) {
+        let ringClass = "story-ring";
+
+        if (stories[i].viewed) {
+            ringClass = "story-ring viewed";
+        }
+
         const storyButton = '<button class="story saved-story" type="button" onclick="openStory(' + i + ')">' +
-            '<span class="story-ring"><img class="story-thumb" src="' + stories[i].image + '" alt="Story photo"></span>' +
+            '<span class="' + ringClass + '"><img class="story-thumb" src="' + stories[i].image + '" alt="Story photo"></span>' +
             '<span class="story-name">Your story</span>' +
             '<span class="story-time">' + getTimeLabel(stories[i].createdAt) + '</span>' +
             '</button>';
@@ -100,6 +106,9 @@ function resizeImage(file) {
 
 function openStory(index) {
     currentStory = index;
+    stories[currentStory].viewed = true;
+    saveStories();
+    showStories();
     storyViewer.className = "viewer open";
     storyViewer.ariaHidden = "false";
     document.body.style.overflow = "hidden";
